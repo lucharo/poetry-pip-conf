@@ -16,6 +16,7 @@ from poetry.repositories.repository_pool import Priority
 # exposed in poetry as a constant.
 DEFAULT_REPO_NAME = "PyPI"
 
+import configparser
 
 class PyPIMirrorPlugin(Plugin):
     # If pypi.org and common mirroring/pull-through-cache software used the same
@@ -26,15 +27,14 @@ class PyPIMirrorPlugin(Plugin):
     # (modified) LegacyRepository - which uses the PEP 503 API.
     def activate(self, poetry: Poetry, io: IO):
 
-        # Environment var overrides poetry configuration
-        pypi_mirror_url = os.environ.get("POETRY_PYPI_MIRROR_URL")
-        pypi_mirror_url = pypi_mirror_url or poetry.config.get("plugins", {}).get(
-            "pypi_mirror", {}
-        ).get("url")
+        confs = ['~/.pip/pip.conf', '~/.config/pip/pip.conf']
 
-        if not pypi_mirror_url:
-            return
+        config = configparser.ConfigParser()
 
+        pipconf = config.read(confs[0]) or  config.read(confs[1]) 
+        
+        if not pipconf: return
+        
         # All keys are lowercased in public functions
         repo_key = DEFAULT_REPO_NAME.lower()
 
