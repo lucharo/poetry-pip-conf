@@ -1,77 +1,51 @@
-# poetry-plugin-pypi-mirror
+# poetry-pip-conf
 
 ## Description
 
-*poetry-plugin-pypi-mirror* is a
+*poetry-pip-conf* is a
 [plugin](https://python-poetry.org/docs/master/plugins/) for
 [poetry](https://python-poetry.org/), the Python packaging and dependency
-manager. It enables poetry to substitute connections to pypi.org with
-connections to a pypi.org mirror or pull-through cache **without requiring
-project configuration changes**. This is ideal for situations where an
-access-restricted or otherwise unsuitable-for-general-use pypi.org mirror must
-be used by a subset of project contributors. For example:
+manager. It enables poetry to use the indices in your pip config file (`pip.conf` in unix based systems).
+This makes it simpler to use poetry in corporate environments or environments where access to pypi.org 
+is limited. 
 
-* A private PyPI mirror internal to a business, required by company policy
-* A limited-access PyPI mirror in a region where pypi.org is restricted
-* A regional mirror that is more performant for a few users, and less performant
-  for everyone else
-
-These mirrors can be used without this plugin by [adding them as project
-repositories](https://python-poetry.org/docs/repositories/). However, this
-requires the mirror to be included in the project's configuration, and this also
-results in source entries for the mirror appearing in `poetry.lock`. Since only
-a subset of project contributors can use these mirrors, that subset of users
-would need to replace and remove references to the mirror repository each time
-they want to contribute their changes back to the project. This is suboptimal.
+This plugin is a fork of [arcesium/poetry-plugin-pypi-mirror](https://github.com/arcesium/poetry-plugin-pypi-mirror)
+that fits my use case best. I invite you to read about the limitations of setting up secondary pypi mirrors using poetry 
+in the [arcesium/poetry-plugin-pypi-mirror](https://github.com/arcesium/poetry-plugin-pypi-mirror) repo. 
 
 ## Usage
 
 ### Installation
 
-Follow poetry's [plugin installation instructions](https://python-poetry.org/docs/master/plugins/#using-plugins), replacing `poetry-plugin` with `poetry-plugin-pypi-mirror`.
-
-### Specifying a mirror
-
-To specify a mirror, you can either define `plugins.pypi_mirror.url` in poetry's
-[configuration](https://python-poetry.org/docs/configuration/), or set
-environment variable `POETRY_PYPI_MIRROR_URL` to the full URL for a [PEP
-503](https://peps.python.org/pep-0503/)-compatible mirror. When both are set the
-environment variable will be used.
-
-#### Poetry config example
-
-```toml
-[plugins]
-[plugins.pypi_mirror]
-url = "https://example.org/repository/pypi-proxy/simple/"
+```
+poetry self add poetry-pip-conf
 ```
 
-... in [either](https://python-poetry.org/docs/configuration/) a project's
-`poetry.toml` (for per-project configuration), or the user's `config.toml`.
+Read more about managing plugins in [poetry's documentation](https://python-poetry.org/docs/master/plugins/#using-plugins)
 
-#### Environment variable example
+No further setup is required. The plugin will look for a pip.conf/pip.ini
+under the locations displayed by `pip config list -v`.
 
-```shell
-POETRY_PYPI_MIRROR_URL=https://example.org/repository/pypi-proxy/simple/ poetry add pendulum
-```
-...or...
+## Example custom pip.conf/pip.ini
 
-```shell
-export POETRY_PYPI_MIRROR_URL=https://example.org/repository/pypi-proxy/simple/
-poetry add cleo # uses mirror specified in first line
-poetry lock     # also uses mirror specified in first line
+```ini
+[global]
+trusted-host = test.pypi.org
+
+[install]
+index-url = https://test.pypi.org/simple
+extra-index-url = https://pypi.org/simple
+		https://mirrors.sustech.edu.cn/pypi/simple
+
+[search]
+index = https://test.pypi.org/simple
 ```
 
 ## Compatibility
 
-*poetry-plugin-pypi-mirror* depends on poetry internals which can change between
-poetry releases. It's important to ensure compatibility between the poetry
-version in use and the plugin version in use.
-
-| Poetry version(s) | Compatible plugin version(s) |
-|-------------------|------------------------------|
-| ~1.3.0            | ^0.3.0                       |
-| ~1.2.1            | < 0.3.0                      |
+*poetry-pip-conf* depends on poetry internals which can change between
+poetry releases. *poetry-pip-conf* only works
+with poetry 1.3.0 and above.
 
 ## See also
 

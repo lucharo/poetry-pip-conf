@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-import os
+import configparser
+import re
+import subprocess as sp
 
 from cleo.io.io import IO
 from poetry.config.config import Config
@@ -10,14 +12,28 @@ from poetry.plugins.plugin import Plugin
 from poetry.poetry import Poetry
 from poetry.repositories.legacy_repository import LegacyRepository
 from poetry.repositories.pypi_repository import PyPiRepository
-from poetry.repositories.repository_pool import Priority
 
 # Hopefully the default repo name never changes. It'd be nice if this value was
 # exposed in poetry as a constant.
 DEFAULT_REPO_NAME = "PyPI"
 
+class PipConfPlugin(Plugin):
 
-class PyPIMirrorPlugin(Plugin):
+    def add_poetry_repo(self, name:str, url:str, poetry: Poetry, default:bool = False):
+
+        repo = SourceStrippedLegacyRepository(
+            name,
+            url,
+            config=poetry.config,
+            disable_cache=False,
+        )
+
+        poetry.pool.add_repository(
+            repository=repo,
+            default=default,
+            secondary=not default,
+        )
+
     # If pypi.org and common mirroring/pull-through-cache software used the same
     # standard API this plugin could simply modify the URL used by
     # PyPiRepository. Unfortunately, PyPiRepository uses the unstable
@@ -26,40 +42,52 @@ class PyPIMirrorPlugin(Plugin):
     # (modified) LegacyRepository - which uses the PEP 503 API.
     def activate(self, poetry: Poetry, io: IO):
 
-        # Environment var overrides poetry configuration
-        pypi_mirror_url = os.environ.get("POETRY_PYPI_MIRROR_URL")
-        pypi_mirror_url = pypi_mirror_url or poetry.config.get("plugins", {}).get(
-            "pypi_mirror", {}
-        ).get("url")
+        confs = sp.check_output('pip config list -v', shell = True)\
+            .decode().split('\n')[:5]
+        confs = [re.findall("For variant '(.*)', will try loading '(.*)'", conf)[0] for conf in confs]
+        config = configparser.ConfigParser()
 
-        if not pypi_mirror_url:
+        for variant, path in confs:
+            pipconf = config.read(path)
+            if pipconf:
+                if io.is_verbose():
+                    io.write_line(f'Using pip config from {path} [variant: {variant}]')
+                break
+        
+        if not pipconf:
+            io.write_error_line('Could not find a valid pip config file, please make sure one exists '
+            'in one the location suggested by `pip config list -v`')
             return
 
+        pipconf = config['install']
+        
         # All keys are lowercased in public functions
         repo_key = DEFAULT_REPO_NAME.lower()
 
         pypi_prioritized_repository = poetry.pool._repositories.get(repo_key)
-
         if pypi_prioritized_repository is None or not isinstance(
             pypi_prioritized_repository.repository, PyPiRepository
         ):
             return
 
-        replacement_repository = SourceStrippedLegacyRepository(
-            DEFAULT_REPO_NAME,
-            pypi_mirror_url,
-            config=poetry.config,
-            disable_cache=pypi_prioritized_repository.repository._disable_cache,
-        )
-
-        priority = pypi_prioritized_repository.priority
+        repos = [pipconf['index-url']]
+        if pipconf['extra-index-url']: 
+            repos += pipconf['extra-index-url'].split('\n')
 
         poetry.pool.remove_repository(DEFAULT_REPO_NAME)
-        poetry.pool.add_repository(
-            repository=replacement_repository,
-            default=priority == Priority.DEFAULT,
-            secondary=priority == Priority.SECONDARY,
-        )
+        self.add_poetry_repo(
+            DEFAULT_REPO_NAME,
+            repos[0],
+            poetry,
+            default=True)
+
+        
+        for num, url in enumerate(repos[1:]):
+            name = f'poetry-{num}'
+            self.add_poetry_repo(name, url, poetry, default=False)
+
+        if io.is_very_verbose():
+            io.write_line('Using the following pypi indices: ' +  ', '.join(repos))
 
 
 class SourceStrippedLegacyRepository(LegacyRepository):
