@@ -23,11 +23,23 @@ poetry self add poetry-pip-conf
 
 Read more about managing plugins in [poetry's documentation](https://python-poetry.org/docs/master/plugins/#using-plugins)
 
-No further setup is required. The plugin will look for a pip.conf under the following locations in this order:
+No further setup is required. The plugin will look for a pip.conf/pip.ini
+under the locations displayed by `pip config list -v`.
 
-1. ~/.pip/pip.conf
-2. ~/.config/pip/pip.conf
+## Example custom pip.conf/pip.ini
 
+```ini
+[global]
+trusted-host = test.pypi.org
+
+[install]
+index-url = https://test.pypi.org/simple
+extra-index-url = https://pypi.org/simple
+		https://mirrors.sustech.edu.cn/pypi/simple
+
+[search]
+index = https://test.pypi.org/simple
+```
 
 ## Compatibility
 
